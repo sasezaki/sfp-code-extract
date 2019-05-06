@@ -2,6 +2,7 @@
 
 namespace Sfp\Code\Extract;
 
+use ReflectionExtension;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
@@ -16,13 +17,27 @@ class ExtractClass
 {
     private const CLASS_SUFFIX = 'Interface';
 
+    /** @var string  */
     private $namespaceName;
+    /** @var array */
     private $proto;
 
-    public function __construct(string $namespaceName, array $proto)
+    /** @var ReflectionExtension */
+    private $reflectionExtension;
+
+    public function __construct(\ReflectionExtension $reflectionExtension, string $namespaceName, array $proto)
     {
+        $this->reflectionExtension = $reflectionExtension;
         $this->namespaceName = $namespaceName;
         $this->proto = $proto;
+    }
+
+    public function getInterfaceGenerators() : \Generator
+    {
+        foreach ($this->reflectionExtension->getClasses() as $class) {
+            $interfaceGenerator = $this->getInterfaceGenerator($class);
+            yield $interfaceGenerator;
+        }
     }
 
     /**
@@ -57,7 +72,6 @@ class ExtractClass
         $parentInterface = $this->formatClassName($parentClass);
         $interfaceGenerator->setImplementedInterfaces([$parentInterface]);
     }
-
 
     private function isParentMethod(ReflectionMethod $method, ReflectionClass $parentClass) : bool {
         $parentMethodNames = [];
@@ -110,6 +124,7 @@ class ExtractClass
                     if ($returnType === 'mixed') {
                         goto set_docblock;
                     }
+
                     $methodGenerator->setReturnType($returnType);
                 } else {
                     if ($method->getName() !== '__construct') {

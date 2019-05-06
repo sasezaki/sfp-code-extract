@@ -19,13 +19,10 @@ if (!is_dir($build_dir)) {
 const NAMESPACE_NAME = 'Sfp\\Code\\Reflection\\Interfaces';
 const CLASS_SUFFIX = 'Interface';
 
-$extractClass = new ExtractClass(NAMESPACE_NAME, $proto);
+$extractClass = new ExtractClass($ref,NAMESPACE_NAME, $proto);
 
 /** @var ReflectionClass $class */
-foreach ($ref->getClasses() as $class) {
-    $interfaceGenerator = $extractClass->getInterfaceGenerator($class);
-
-
+foreach ($extractClass->getInterfaceGenerators() as $interfaceGenerator) {
     $file = $build_dir . DIRECTORY_SEPARATOR . $interfaceGenerator->getName() . '.php';
     touch($file);
     file_put_contents($file, '<?php' . "\n");
