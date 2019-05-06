@@ -1,13 +1,14 @@
 #!/usr/bin/php
 <?php
+
+use Sfp\Code\Extract\ExtensionSource;
 use Zend\Code\Generator\InterfaceGenerator;
 use Zend\Code\Generator\MethodGenerator;
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 $ref = new ReflectionExtension('Reflection');
-$proto = analyse_proto(__DIR__ . '/../php_reflection.c');
-$build_dir = dirname(__DIR__) . '/src-build';
+$proto = ExtensionSource::analyseProto(__DIR__ . '/../php_reflection.c');
+$build_dir = dirname(__DIR__) . '/src-build2';
 
 if (!is_dir($build_dir)) {
     mkdir($build_dir);
@@ -15,26 +16,23 @@ if (!is_dir($build_dir)) {
     `rm -f {$build_dir}/*`;
 }
 
-
-$parentMethods = get_parent_methods($ref);
-
 const NAMESPACE_NAME = 'Sfp\\Code\\Reflection\\Interfaces';
 const CLASS_SUFFIX = 'Interface';
 
 /** @var ReflectionClass $class */
 foreach ($ref->getClasses() as $class) {
-
     $interfaceGenerator = new InterfaceGenerator;
     $interfaceGenerator->setNamespaceName(NAMESPACE_NAME);
     $interfaceGenerator->setName($class->getName() . CLASS_SUFFIX);
 
-    if (isset($parentMethods[$class->getName()])) {
-        $parentInterface = sprintf('%s\\%sInterface', NAMESPACE_NAME, $parentMethods[$class->getName()]['__PARENT_CLASS__']);
+    $parentClass = $class->getParentClass();
+    if ($parentClass) {
+        $parentInterface = sprintf('%s\\%sInterface', NAMESPACE_NAME, $parentClass->getName());
         $interfaceGenerator->setImplementedInterfaces([$parentInterface]);
     }
 
     foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-        if (isset($parentMethods[$class->getName()]) && in_array($method->getName(), $parentMethods[$class->getName()])) {
+        if ($parentClass && in_array($method, $parentClass->getMethods(ReflectionMethod::IS_PUBLIC))) {
             continue;
         }
 
@@ -90,22 +88,4 @@ foreach ($ref->getClasses() as $class) {
     touch($file);
     file_put_contents($file, '<?php' . "\n");
     file_put_contents($file, $interfaceGenerator->generate(), FILE_APPEND);
-}
-
-function get_parent_methods(ReflectionExtension $ref) {
-
-    $parentMethods = [];
-    foreach ($ref->getClasses() as $class) {
-        /** @var ReflectionClass $parent */
-        $parent = $class->getParentClass();
-        if ($parent === false) {
-            continue;
-        }
-        $parentMethods[$class->getName()]['__PARENT_CLASS__'] = $parent->getName();
-
-        foreach ($parent->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-            $parentMethods[$class->getName()][] = $method->getName();
-        }
-    }
-    return $parentMethods;
 }
