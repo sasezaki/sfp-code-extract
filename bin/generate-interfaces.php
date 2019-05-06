@@ -4,6 +4,8 @@
 use Sfp\Code\Extract\ExtensionSource;
 use Zend\Code\Generator\InterfaceGenerator;
 use Zend\Code\Generator\MethodGenerator;
+use Zend\Code\Reflection\MethodReflection;
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 $ref = new ReflectionExtension('Reflection');
@@ -21,6 +23,15 @@ const CLASS_SUFFIX = 'Interface';
 
 /** @var ReflectionClass $class */
 foreach ($ref->getClasses() as $class) {
+    $interfaceGenerator = getInterfaceGenerator($class, $proto);
+
+    $file = $build_dir . DIRECTORY_SEPARATOR . $interfaceGenerator->getName() . '.php';
+    touch($file);
+    file_put_contents($file, '<?php' . "\n");
+    file_put_contents($file, $interfaceGenerator->generate(), FILE_APPEND);
+}
+
+function getInterfaceGenerator(ReflectionClass $class, array $proto) : InterfaceGenerator {
     $interfaceGenerator = new InterfaceGenerator;
     $interfaceGenerator->setNamespaceName(NAMESPACE_NAME);
     $interfaceGenerator->setName($class->getName() . CLASS_SUFFIX);
@@ -32,8 +43,14 @@ foreach ($ref->getClasses() as $class) {
     }
 
     foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-        if ($parentClass && in_array($method, $parentClass->getMethods(ReflectionMethod::IS_PUBLIC))) {
-            continue;
+        $parentMethodNames = [];
+        if ($parentClass) {
+            foreach ($parentClass->getMethods(ReflectionMethod::IS_PUBLIC) as $parentMethod) {
+                $parentMethodNames[] = $parentMethod->getName();
+            }
+            if ($parentClass && in_array($method->getName(), $parentMethodNames)) {
+                continue;
+            }
         }
 
         $methodReflection = new Zend\Code\Reflection\MethodReflection($class->getName(), $method->getName());
@@ -84,8 +101,5 @@ foreach ($ref->getClasses() as $class) {
         $interfaceGenerator->addMethodFromGenerator($methodGenerator);
     }
 
-    $file = $build_dir . DIRECTORY_SEPARATOR . $interfaceGenerator->getName() . '.php';
-    touch($file);
-    file_put_contents($file, '<?php' . "\n");
-    file_put_contents($file, $interfaceGenerator->generate(), FILE_APPEND);
+    return $interfaceGenerator;
 }
