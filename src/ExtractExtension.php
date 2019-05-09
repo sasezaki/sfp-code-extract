@@ -13,7 +13,7 @@ use Zend\Code\Generator\InterfaceGenerator;
 use Zend\Code\Generator\MethodGenerator;
 use Zend\Code\Reflection\MethodReflection;
 
-class ExtractClass
+class ExtractExtension
 {
     private const CLASS_SUFFIX = 'Interface';
 
@@ -32,11 +32,15 @@ class ExtractClass
         $this->proto = $proto;
     }
 
+    /**
+     * @return InterfaceGenerator[]
+     * @throws ReflectionException
+     */
     public function getInterfaceGenerators() : \Generator
     {
         foreach ($this->reflectionExtension->getClasses() as $class) {
             $interfaceGenerator = $this->getInterfaceGenerator($class);
-            yield $interfaceGenerator;
+            yield $class => $interfaceGenerator;
         }
     }
 
@@ -63,17 +67,18 @@ class ExtractClass
         return $interfaceGenerator;
     }
 
-    private function formatClassName(ReflectionClass $class) {
-        return sprintf('%s\\%sInterface', $this->namespaceName, $class->getName());
+    private function formatClassName(string $className) {
+        return sprintf('%s\\%sInterface', $this->namespaceName, $className);
     }
 
     private function implementParentAsInterface(ReflectionClass $parentClass, InterfaceGenerator $interfaceGenerator) : void
     {
-        $parentInterface = $this->formatClassName($parentClass);
+        $parentInterface = $this->formatClassName($parentClass->getName());
         $interfaceGenerator->setImplementedInterfaces([$parentInterface]);
     }
 
-    private function isParentMethod(ReflectionMethod $method, ReflectionClass $parentClass) : bool {
+    private function isParentMethod(ReflectionMethod $method, ReflectionClass $parentClass) : bool
+    {
         $parentMethodNames = [];
         foreach ($parentClass->getMethods(ReflectionMethod::IS_PUBLIC) as $parentMethod) {
             $parentMethodNames[] = $parentMethod->getName();
@@ -94,7 +99,7 @@ class ExtractClass
         $proto = $this->proto;
 
         $methodReflection = new MethodReflection($class->getName(), $method->getName());
-        $methodGenerator = MethodGenerator::fromReflection($methodReflection);
+        $methodGenerator = MethodGenerator::fromReflection($methodReflection, $interfaceGenerator->getUses());
         if (NULL !== $methodReflection->getReturnType()) {
             $methodGenerator->setReturnType($methodReflection->getReturnType());
         } else {
@@ -125,6 +130,13 @@ class ExtractClass
                         goto set_docblock;
                     }
 
+                    if (in_array($returnType, $this->reflectionExtension->getClassNames())) {
+                        $returnTypeFQCN = $this->formatClassName($returnType);
+                        if (!$interfaceGenerator->hasUse($returnTypeFQCN)) {
+                            $interfaceGenerator->addUse($returnTypeFQCN);
+                        }
+                        $returnType = $returnType . self::CLASS_SUFFIX;
+                    }
                     $methodGenerator->setReturnType($returnType);
                 } else {
                     if ($method->getName() !== '__construct') {

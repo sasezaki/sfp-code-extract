@@ -2,7 +2,7 @@
 <?php
 
 use Sfp\Code\Extract\ExtensionSource;
-use Sfp\Code\Extract\ExtractClass;
+use Sfp\Code\Extract\ExtractExtension;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -19,10 +19,13 @@ if (!is_dir($build_dir)) {
 const NAMESPACE_NAME = 'Sfp\\Code\\Reflection\\Interfaces';
 const CLASS_SUFFIX = 'Interface';
 
-$extractClass = new ExtractClass($ref,NAMESPACE_NAME, $proto);
+$ignoreClasses = [Reflection::class];
+$extractClass = new ExtractExtension($ref,NAMESPACE_NAME, $proto);
 
-/** @var ReflectionClass $class */
-foreach ($extractClass->getInterfaceGenerators() as $interfaceGenerator) {
+foreach ($extractClass->getInterfaceGenerators() as $class => $interfaceGenerator) {
+    if (in_array($class->getName(), $ignoreClasses)) {
+        continue;
+    }
     $file = $build_dir . DIRECTORY_SEPARATOR . $interfaceGenerator->getName() . '.php';
     touch($file);
     file_put_contents($file, '<?php' . "\n");
